@@ -68,7 +68,7 @@ jobs:
           PASSWORD: ${{ secrets.PASSWORD }}
           WXPUSHER_TOKEN: ${{ secrets.WXPUSHER_TOKEN }}
           WXPUSHER_UID: ${{ secrets.WXPUSHER_UID }}
-          USE_PROXY: "1"
+          USE_PROXY: "0"
           DISPLAY: ":99"
           # schedule 触发时 github.event_name == 'schedule'，enable_recording 输入不存在，默认空字符串
           ENABLE_RECORDING: ${{ github.event.inputs.enable_recording }}
