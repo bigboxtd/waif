@@ -70,8 +70,6 @@ jobs:
           WXPUSHER_UID: ${{ secrets.WXPUSHER_UID }}
           USE_PROXY: "1"
           DISPLAY: ":99"
-          LIBGL_ALWAYS_SOFTWARE: "1"
-          GALLIUM_DRIVER: "llvmpipe"
           # schedule 触发时 github.event_name == 'schedule'，enable_recording 输入不存在，默认空字符串
           ENABLE_RECORDING: ${{ github.event.inputs.enable_recording }}
         run: |
@@ -85,10 +83,26 @@ jobs:
           fi
 
           # 启动 Xvfb 虚拟显示器
-          Xvfb :99 -screen 0 1280x720x24 +extension RANDR &
+          Xvfb :99 -screen 0 1280x720x24 -ac +extension RANDR &
           XVFB_PID=$!
-          sleep 2
-          DISPLAY=:99 xdpyinfo > /dev/null 2>&1 && echo "Xvfb 就绪" || echo "Xvfb 启动异常"
+          sleep 3
+
+          XVFB_OK=0
+          for i in 1 2 3 4 5; do
+            if DISPLAY=:99 xdpyinfo > /dev/null 2>&1; then
+              XVFB_OK=1
+              echo "Xvfb 就绪"
+              break
+            fi
+            echo "Xvfb 未就绪，重试 $i/5..."
+            sleep 2
+          done
+
+          if [ "$XVFB_OK" != "1" ]; then
+            echo "❌ Xvfb 多次检测仍未就绪，终止任务（避免浏览器卡死空跑270s）"
+            kill $XVFB_PID 2>/dev/null || true
+            exit 1
+          fi
 
           # 按需启动录屏
           RECORD_PID=""
