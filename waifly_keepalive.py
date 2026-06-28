@@ -186,6 +186,22 @@ def login(page, max_retries=3) -> bool:
 
         take_screenshot(page, f"01_filled_{attempt}")
 
+        # 点击前模拟一段真实的鼠标移动 + 较长随机停顿，
+        # 避免"填完表单立刻精准点提交"这种过于规律的节奏被风险评分判定为脚本
+        try:
+            box = page.locator("button#createAccount").first.bounding_box()
+            if box:
+                start_x, start_y = box["x"] - 80, box["y"] - 40
+                end_x = box["x"] + box["width"] / 2
+                end_y = box["y"] + box["height"] / 2
+                page.mouse.move(start_x, start_y)
+                time.sleep(random.uniform(0.15, 0.3))
+                steps = random.randint(8, 15)
+                page.mouse.move(end_x, end_y, steps=steps)
+        except Exception as e:
+            log.warning(f"模拟鼠标轨迹失败: {e}")
+        human_delay(1.2, 2.5)
+
         try:
             page.locator("button#createAccount").first.click()
         except Exception as e:
