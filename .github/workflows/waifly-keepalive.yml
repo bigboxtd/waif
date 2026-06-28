@@ -5,7 +5,16 @@ on:
     # 每10天的 01:30 UTC 运行一次（约等于北京时间 09:30）
     # GitHub Actions 的 cron 不支持"每N天"，用"日期能被10整除"近似实现
     - cron: '30 1 */10 * *'
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      enable_recording:
+        description: '是否录屏（仅手动触发时有效）'
+        required: false
+        default: 'false'
+        type: choice
+        options:
+          - 'false'
+          - 'true'
 
 jobs:
   keepalive:
@@ -63,18 +72,62 @@ jobs:
           DISPLAY: ":99"
           LIBGL_ALWAYS_SOFTWARE: "1"
           GALLIUM_DRIVER: "llvmpipe"
+          # schedule 触发时 github.event_name == 'schedule'，enable_recording 输入不存在，默认空字符串
+          ENABLE_RECORDING: ${{ github.event.inputs.enable_recording }}
         run: |
+          # 判断是否录屏：仅当手动触发且选择 true 时才录屏
+          if [ "$ENABLE_RECORDING" = "true" ]; then
+            DO_RECORD=true
+            echo "📹 录屏已开启"
+          else
+            DO_RECORD=false
+            echo "📹 录屏已关闭（定时任务默认不录屏）"
+          fi
+
+          # 启动 Xvfb 虚拟显示器
           Xvfb :99 -screen 0 1280x720x24 +extension RANDR &
           XVFB_PID=$!
           sleep 2
           DISPLAY=:99 xdpyinfo > /dev/null 2>&1 && echo "Xvfb 就绪" || echo "Xvfb 启动异常"
+
+          # 按需启动录屏
+          RECORD_PID=""
+          if [ "$DO_RECORD" = "true" ]; then
+            ffmpeg -f x11grab -video_size 1280x720 -framerate 15 -i :99 \
+              -codec:v libx264 -preset ultrafast -crf 28 \
+              -pix_fmt yuv420p -movflags +faststart /tmp/recording.mp4 \
+              > /tmp/ffmpeg.log 2>&1 &
+            RECORD_PID=$!
+            sleep 3
+            echo "录屏进程 PID: $RECORD_PID"
+          fi
 
           timeout 270 python waifly_keepalive.py || echo "脚本退出码: $?"
 
           echo "=== 截图目录内容 ==="
           ls -la ./screenshots/ || echo "截图目录不存在"
 
+          # 停止录屏（如果开启了）
+          if [ -n "$RECORD_PID" ]; then
+            sleep 2
+            kill $RECORD_PID 2>/dev/null || true
+            wait $RECORD_PID 2>/dev/null || true
+            VIDEO_SIZE=$(stat -c%s /tmp/recording.mp4 2>/dev/null || echo 0)
+            echo "录像文件大小: ${VIDEO_SIZE} bytes"
+          fi
+
           kill $XVFB_PID 2>/dev/null || true
+
+      - name: 上传录屏（仅手动录屏时）
+        if: always() && github.event.inputs.enable_recording == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: recording-${{ github.run_number }}
+          path: |
+            /tmp/recording.mp4
+            /tmp/ffmpeg.log
+          if-no-files-found: ignore
+          retention-days: 3
 
       - name: 上传截图
         if: always()
