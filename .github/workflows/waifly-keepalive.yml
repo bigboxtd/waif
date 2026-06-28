@@ -37,17 +37,21 @@ jobs:
           pip install -r requirements.txt
           python -c "from cloakbrowser import ensure_binary; ensure_binary()"
 
-      # 如果 Waifly 对 GitHub Actions 出口 IP 有风控（比如登录被拦/触发额外验证），
-      # 取消下面这一段的注释，并把 USE_PROXY 改成 "1"，同时配置 V2RAY_CONFIG secret
-      # - name: 下载并启动 Xray 代理
-      #   env:
-      #     V2RAY_CONFIG: ${{ secrets.V2RAY_CONFIG }}
-      #   run: |
-      #     curl -sL https://github.com/XTLS/Xray-core/releases/download/v25.5.16/Xray-linux-64.zip -o xray.zip
-      #     unzip xray.zip && chmod +x xray
-      #     echo "$V2RAY_CONFIG" > config.json
-      #     ./xray run -c config.json &
-      #     sleep 5
+      - name: 下载并启动 Xray 代理
+        env:
+          V2RAY_CONFIG: ${{ secrets.V2RAY_CONFIG }}
+        run: |
+          curl -sL https://github.com/XTLS/Xray-core/releases/download/v25.5.16/Xray-linux-64.zip -o xray.zip
+          unzip xray.zip && chmod +x xray
+          echo "$V2RAY_CONFIG" > config.json
+          ./xray run -c config.json &
+          sleep 5
+          echo "直连 IP："
+          curl -s --max-time 5 ifconfig.me
+          echo ""
+          echo "代理 IP："
+          curl -s --max-time 5 --socks5 127.0.0.1:10808 ifconfig.me
+          echo ""
 
       - name: 运行脚本
         env:
@@ -55,7 +59,7 @@ jobs:
           PASSWORD: ${{ secrets.PASSWORD }}
           WXPUSHER_TOKEN: ${{ secrets.WXPUSHER_TOKEN }}
           WXPUSHER_UID: ${{ secrets.WXPUSHER_UID }}
-          USE_PROXY: "0"
+          USE_PROXY: "1"
           DISPLAY: ":99"
           LIBGL_ALWAYS_SOFTWARE: "1"
           GALLIUM_DRIVER: "llvmpipe"
