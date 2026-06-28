@@ -202,6 +202,18 @@ def login(page, max_retries=3) -> bool:
             log.warning(f"模拟鼠标轨迹失败: {e}")
         human_delay(1.2, 2.5)
 
+        # 等 grecaptcha enterprise 脚本和 token 生成准备就绪，
+        # 太早提交可能拿到无效/未生成完的 token，导致 "Security check failed"
+        try:
+            page.wait_for_function(
+                "() => window.grecaptcha && window.grecaptcha.enterprise && typeof window.grecaptcha.enterprise.execute === 'function'",
+                timeout=8000
+            )
+            log.info("grecaptcha enterprise 已就绪")
+        except Exception:
+            log.warning("等待 grecaptcha enterprise 就绪超时，继续尝试提交")
+        human_delay(0.8, 1.5)
+
         try:
             page.locator("button#createAccount").first.click()
         except Exception as e:
