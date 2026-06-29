@@ -1,7 +1,7 @@
 name: Waifly保活 (CloakBrowser)
 
 on:
-  schedule:
+  #schedule:
     # 每10天的 01:30 UTC 运行一次（约等于北京时间 09:30）
     # GitHub Actions 的 cron 不支持"每N天"，用"日期能被10整除"近似实现
     - cron: '30 1 */10 * *'
